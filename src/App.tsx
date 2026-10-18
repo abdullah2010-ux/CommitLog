@@ -60,7 +60,6 @@ interface PersistedTimerState {
 export default function App() {
   const todayStr = getTodayStr();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const isInitialHydrationRef = useRef(true);
 
   // Clean up any old v1 demo storage keys on first load
   useEffect(() => {
@@ -154,43 +153,7 @@ export default function App() {
 
   const [displayTimerSeconds, setDisplayTimerSeconds] = useState<number>(0);
 
-  // Hydrate from server disk store (/api/progress) if local browser storage is empty
-  useEffect(() => {
-    let cancelled = false;
-    async function syncFromServer() {
-      try {
-        const res = await fetch('/api/progress');
-        if (!res.ok) return;
-        const serverStore = await res.json();
-        if (cancelled) return;
-
-        const localHasSessions =
-          (JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]') as unknown[]).length > 0;
-        const localHasJournals =
-          (JSON.parse(localStorage.getItem(STORAGE_KEYS.JOURNALS) || '[]') as unknown[]).length > 0;
-
-        if (!localHasSessions && Array.isArray(serverStore.sessions) && serverStore.sessions.length > 0) {
-          setSessions(serverStore.sessions);
-        }
-        if (!localHasJournals && Array.isArray(serverStore.journals) && serverStore.journals.length > 0) {
-          setJournals(serverStore.journals);
-        }
-        if (serverStore.targets && !localStorage.getItem(STORAGE_KEYS.TARGETS)) {
-          setTargets({ ...DEFAULT_TARGETS, ...serverStore.targets });
-        }
-      } catch {
-        // Fallback to localStorage seamlessly
-      } finally {
-        isInitialHydrationRef.current = false;
-      }
-    }
-    syncFromServer();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Automatically save every change to both localStorage AND backend disk (/api/progress)
+  // Automatically save every change to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
@@ -206,16 +169,6 @@ export default function App() {
       second: '2-digit',
     });
     setLastSavedAt(nowFormatted);
-
-    if (isInitialHydrationRef.current) return;
-
-    fetch('/api/progress', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targets, sessions, journals }),
-    }).catch(() => {
-      // localStorage already persisted
-    });
   }, [sessions, journals, targets]);
 
   // Persist timer state and compute live elapsed seconds
@@ -375,7 +328,6 @@ export default function App() {
     sessionData: Omit<CodingSession, 'id' | 'createdAt'>,
     existingId?: string
   ) => {
-    isInitialHydrationRef.current = false;
     if (existingId) {
       setSessions((prev) =>
         prev.map((s) => (s.id === existingId ? { ...s, ...sessionData } : s))
@@ -408,7 +360,6 @@ export default function App() {
   };
 
   const handleIncrementSession = (id: string) => {
-    isInitialHydrationRef.current = false;
     setSessions((prev) =>
       prev.map((s) =>
         s.id === id
@@ -423,7 +374,6 @@ export default function App() {
   };
 
   const handleDeleteSession = (id: string) => {
-    isInitialHydrationRef.current = false;
     setSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -431,7 +381,6 @@ export default function App() {
     entryData: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>,
     existingId?: string
   ) => {
-    isInitialHydrationRef.current = false;
     const now = new Date().toISOString();
     if (existingId) {
       setJournals((prev) =>
@@ -458,7 +407,6 @@ export default function App() {
   };
 
   const handleDeleteJournal = (id: string) => {
-    isInitialHydrationRef.current = false;
     setJournals((prev) => prev.filter((j) => j.id !== id));
   };
 
@@ -534,7 +482,6 @@ export default function App() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
-        isInitialHydrationRef.current = false;
         if (Array.isArray(parsed.sessions)) setSessions(parsed.sessions);
         if (Array.isArray(parsed.journals)) setJournals(parsed.journals);
         if (parsed.targets) setTargets({ ...DEFAULT_TARGETS, ...parsed.targets });
@@ -547,7 +494,6 @@ export default function App() {
   };
 
   const handleClearAllData = () => {
-    isInitialHydrationRef.current = false;
     setSessions([]);
     setJournals([]);
     setSelectedDate(todayStr);
