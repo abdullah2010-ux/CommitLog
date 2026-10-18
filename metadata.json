@@ -1,0 +1,6 @@
+{
+  "name": "CommitLog — Daily Coding Progress & Dev Journal",
+  "description": "Track your daily coding sessions, active coding days, GitHub-style contribution heatmap, and developer progress journal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
